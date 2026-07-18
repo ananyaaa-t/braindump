@@ -1,0 +1,84 @@
+name: Braindump
+options:
+  bundleIdPrefix: com.athapar
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+targets:
+  Braindump:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Braindump
+    info:
+      path: Braindump/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIAppFonts:
+          - CormorantGaramond-Italic.ttf
+          - EBGaramond-Regular.ttf
+          - EBGaramond-Italic.ttf
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        CFBundleDisplayName: Braindump
+        NSMicrophoneUsageDescription: Braindump uses your microphone to let you dictate notes by voice.
+        NSSpeechRecognitionUsageDescription: Braindump transcribes your voice into text, on-device, so you can write notes hands-free.
+    entitlements:
+      path: Braindump/Braindump.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.athapar.braindump
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.athapar.braindump
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: BraindumpWidgetExtension
+        embed: true
+  BraindumpWidgetExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: BraindumpWidget
+      - path: Braindump/Models/Page.swift
+      - path: Braindump/DesignSystem/Colors.swift
+      - path: Braindump/DesignSystem/Typography.swift
+      - path: Braindump/Services/NoteAnalyzer.swift
+      - path: Braindump/Services/SharedModelContainer.swift
+      - path: Braindump/Fonts/CormorantGaramond-Italic.ttf
+      - path: Braindump/Fonts/EBGaramond-Regular.ttf
+      - path: Braindump/Fonts/EBGaramond-Italic.ttf
+    info:
+      path: BraindumpWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Braindump Widget
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        UIAppFonts:
+          - CormorantGaramond-Italic.ttf
+          - EBGaramond-Regular.ttf
+          - EBGaramond-Italic.ttf
+    entitlements:
+      path: BraindumpWidget/BraindumpWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.athapar.braindump
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.athapar.braindump.widget
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        SKIP_INSTALL: "YES"
