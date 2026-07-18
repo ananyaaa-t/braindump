@@ -1,9 +1,10 @@
 # Braindump
 
-A personal, mobile-first notes app for iOS. A flat list of "pages," each with
-its own solid pastel background color — no folders, no nested pages, no
-block-based editor. Closer to a stack of colored notecards than a
-productivity tool.
+A personal, mobile notes app for iOS. An aesthetic take on the Apple Notes
+app for people who want more organization than the default app but less than
+Notion — a flat list of "pages," each with its own solid pastel background
+color, no folders, no nested pages, no block-based editor. Closer to a stack
+of colored notecards than a productivity tool.
 
 ## Stack
 
