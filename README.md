@@ -17,11 +17,14 @@ Not on the App Store yet, so here's what it actually looks like.
 
 Nothing here calls out to a server. Apple's on-device model reads a page and
 writes a quick summary, tags it (to-do, idea, project, journal, goal), and
-you can just talk instead of typing if you'd rather dictate a note. There's
-also a semantic search that actually understands what you're looking for
-instead of just matching substrings. If the model isn't available — older
-OS, unsupported device — everything quietly falls back to a simpler
-keyword-based version instead of breaking.
+can pull out concrete to-dos from a rambling note and turn them into a
+checklist. You can also just talk instead of typing if you'd rather dictate
+a note. There's a semantic search too, one that actually understands what
+you're looking for instead of just matching substrings. If the model isn't
+available or doesn't respond (older OS, unsupported device, or it just
+fails), everything quietly falls back to a simpler keyword-based version
+instead of breaking, and the app tells you that's what happened instead of
+pretending nothing's different.
 
 ## Features
 
@@ -35,7 +38,7 @@ keyword-based version instead of breaking.
 
 ## Try it
 
-Not on the App Store yet — still need to get through Apple Developer
+Not on the App Store yet, still need to get through Apple Developer
 enrollment. Once that's done I'll drop a TestFlight link here. For now,
 clone it and run it yourself in Xcode (iOS 17+, though you'll want iOS 26+
 to actually see the AI features do anything).
