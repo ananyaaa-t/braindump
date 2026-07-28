@@ -86,6 +86,20 @@ struct RichTextEditor: UIViewRepresentable {
 
         context.coordinator.textView = textView
 
+        let checklistTapRecognizer = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleChecklistTap(_:))
+        )
+        // Without this, this recognizer (which recognizes *any* single tap
+        // in the text view, not just ones on a checkbox — the glyph check
+        // happens afterward, inside the handler) would cancel touch
+        // delivery to UITextView's own internal tap recognizers, which are
+        // what place the cursor and focus the keyboard. That regression
+        // made it impossible to tap into the body to type at all.
+        checklistTapRecognizer.cancelsTouchesInView = false
+        checklistTapRecognizer.delegate = context.coordinator
+        textView.addGestureRecognizer(checklistTapRecognizer)
+
         // A non-scrolling UITextView sitting inside a SwiftUI ScrollView
         // fights the ScrollView's own pan gesture for every touch-and-drag —
         // without this, the outer ScrollView usually wins, so a user's
@@ -130,7 +144,7 @@ struct RichTextEditor: UIViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, UITextViewDelegate {
+    final class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
         var page: Page
         weak var textView: UITextView?
         weak var controller: RichTextEditorController?
@@ -237,9 +251,18 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func toggleCurrentChecklistItem() {
+            toggleChecklistLine(at: textView?.selectedRange ?? NSRange(location: 0, length: 0))
+        }
+
+        /// Shared toggle used by both the "Aa" menu's "Toggle Done" button
+        /// (passes the current selection) and the direct checkbox tap
+        /// gesture (passes the tapped character index) — so tapping the ○/●
+        /// glyph itself works, not just the menu.
+        private func toggleChecklistLine(at range: NSRange) {
             guard let textView else { return }
             let nsString = textView.attributedText.string as NSString
-            let paragraphRange = nsString.paragraphRange(for: textView.selectedRange)
+            guard range.location <= nsString.length else { return }
+            let paragraphRange = nsString.paragraphRange(for: range)
             let lineText = nsString.substring(with: paragraphRange)
             let stripped = ParagraphMarker.stripMarker(from: lineText)
             guard stripped.kind == .checklist else { return }
@@ -248,9 +271,61 @@ struct RichTextEditor: UIViewRepresentable {
             let replacement = ParagraphAttributedText.buildLine(kind: .checklist, style: .body, isChecked: newChecked, text: stripped.text)
 
             guard let mutable = textView.attributedText.mutableCopy() as? NSMutableAttributedString else { return }
+            let priorSelection = textView.selectedRange
             mutable.replaceCharacters(in: paragraphRange, with: replacement)
             textView.attributedText = mutable
+            textView.selectedRange = priorSelection
             syncParagraphs(from: textView)
+        }
+
+        /// Tap gesture target for directly checking/unchecking an item by
+        /// tapping its ○/● glyph, the way Notes/Reminders-style checklists
+        /// work — previously the only way to toggle was placing the cursor
+        /// on the line and using the "Aa" menu's "Toggle Done" button.
+        @objc func handleChecklistTap(_ recognizer: UITapGestureRecognizer) {
+            guard let textView else { return }
+            let point = recognizer.location(in: textView)
+            let layoutManager = textView.layoutManager
+            let textContainer = textView.textContainer
+
+            let characterIndex = layoutManager.characterIndex(
+                for: point,
+                in: textContainer,
+                fractionOfDistanceBetweenInsertionPoints: nil
+            )
+            let nsString = textView.attributedText.string as NSString
+            guard characterIndex < nsString.length else { return }
+
+            let paragraphRange = nsString.paragraphRange(for: NSRange(location: characterIndex, length: 0))
+            let lineText = nsString.substring(with: paragraphRange)
+            let stripped = ParagraphMarker.stripMarker(from: lineText)
+            guard stripped.kind == .checklist else { return }
+
+            // Only toggle when the tap actually landed on the marker glyph
+            // (with a little extra padding for a comfortable touch target),
+            // not anywhere else on the line — elsewhere should just place
+            // the cursor for editing, as normal.
+            let markerLength = ParagraphMarker.markerLength(for: .checklist, isChecked: stripped.isChecked)
+            let markerRange = NSRange(location: paragraphRange.location, length: markerLength)
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: markerRange, actualCharacterRange: nil)
+            var markerRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            markerRect = markerRect.insetBy(dx: -12, dy: 0)
+            markerRect.size.height = max(markerRect.height, 32)
+            guard markerRect.contains(point) else { return }
+
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            toggleChecklistLine(at: NSRange(location: characterIndex, length: 0))
+        }
+
+        // Belt-and-suspenders alongside `cancelsTouchesInView = false`: makes
+        // sure this recognizer never blocks UITextView's own tap recognizers
+        // (cursor placement, becoming first responder) even if a future
+        // change adds another gesture recognizer to the mix.
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            true
         }
 
         func applyFormat(kind: ParagraphKind, style: ParagraphStyle) {
