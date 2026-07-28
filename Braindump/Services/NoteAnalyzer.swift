@@ -26,6 +26,26 @@ struct GeneratedTags {
     var tags: [String]
 }
 
+/// Structured output schema for `NoteAnalyzer.extractActionItems`. Left
+/// unconstrained in content (unlike `GeneratedTags`) since action items are
+/// free-form, but capped in count so a rambling note doesn't turn into a
+/// wall of low-signal checklist entries.
+@available(iOS 26.0, *)
+@Generable
+struct ExtractedActionItems {
+    @Guide(
+        description: """
+        Concrete, actionable to-do items mentioned or implied in the note. \
+        Each item should be short (a few words) and phrased as an action \
+        ("Call the dentist", not "I need to call the dentist"). Return an \
+        empty list if the note doesn't contain any clear action items \
+        rather than forcing something.
+        """,
+        .maximumCount(6)
+    )
+    var items: [String]
+}
+
 enum NoteAnalyzer {
     private static let sentenceEmbedding = NLEmbedding.sentenceEmbedding(for: .english)
 
@@ -142,27 +162,62 @@ enum NoteAnalyzer {
         return distance.isFinite ? distance : nil
     }
 
-    /// Generates a real 1-2 sentence overview using Apple's on-device
-    /// Foundation Models (Apple Intelligence), when available. Returns nil on
-    /// unsupported OS versions, ineligible devices, or if generation fails for
-    /// any reason — callers should fall back to `summary(for:)` in that case.
+    /// Human-readable explanation for why the on-device model isn't usable
+    /// right now, or nil when it's fully available. Surfaced in the UI so
+    /// falling back to the keyword/extractive heuristics is an explained
+    /// state rather than a silent, unexplained downgrade.
     @available(iOS 26.0, *)
-    static func generativeOverview(for page: Page) async -> String? {
-        guard case .available = SystemLanguageModel.default.availability else { return nil }
+    static func unavailabilityMessage(for availability: SystemLanguageModel.Availability) -> String? {
+        switch availability {
+        case .available:
+            return nil
+        case .unavailable(let reason):
+            switch reason {
+            case .deviceNotEligible:
+                return "Apple Intelligence isn't supported on this device."
+            case .appleIntelligenceNotEnabled:
+                return "Turn on Apple Intelligence in Settings to unlock the AI features."
+            case .modelNotReady:
+                return "Apple Intelligence is still getting ready on this device. Try again in a bit."
+            @unknown default:
+                return "Apple Intelligence isn't available right now."
+            }
+        }
+    }
 
+    /// A single session shared across a page's generative calls (overview,
+    /// tags, action items) instead of spinning up a fresh one per call —
+    /// cuts down on redundant setup and lets the model carry shared context
+    /// across the related generations for that note. `prewarm()` kicks off
+    /// asset loading immediately so the first real call isn't paying that
+    /// cost on the critical path.
+    @available(iOS 26.0, *)
+    static func makeSession() -> LanguageModelSession {
+        let session = LanguageModelSession(
+            instructions: """
+            You help organize a personal notes app. Depending on what's \
+            asked, you either summarize a note in 1-2 plain sentences, \
+            classify it into tags from a fixed set, or pull out concrete \
+            action items. Stay factual and concise; no preamble, no \
+            markdown, no restating the instructions.
+            """
+        )
+        session.prewarm()
+        return session
+    }
+
+    /// Generates a real 1-2 sentence overview using Apple's on-device
+    /// Foundation Models (Apple Intelligence). Returns nil if generation
+    /// fails for any reason — callers should fall back to `summary(for:)`
+    /// in that case.
+    @available(iOS 26.0, *)
+    static func generativeOverview(for page: Page, session: LanguageModelSession) async -> String? {
         let content = ([page.title] + page.paragraphs
             .sorted { $0.sortOrder < $1.sortOrder }
             .map(\.text))
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty else { return nil }
-
-        let session = LanguageModelSession(
-            instructions: """
-            You summarize short personal notes in 1-2 plain, factual sentences. \
-            No preamble, no restating that it's a summary, no markdown.
-            """
-        )
 
         do {
             let response = try await session.respond(to: "Summarize this note:\n\n\(content)")
@@ -175,27 +230,17 @@ enum NoteAnalyzer {
 
     /// Generates 1-2 structured tags using Apple's on-device Foundation
     /// Models, constrained to the same vocabulary as the keyword-based
-    /// `suggestedTags(for:)`. Returns nil on unsupported OS versions,
-    /// ineligible devices, or if generation fails for any reason — callers
-    /// should fall back to `suggestedTags(for:)` in that case.
+    /// `suggestedTags(for:)`. Returns nil if generation fails for any
+    /// reason — callers should fall back to `suggestedTags(for:)` in that
+    /// case.
     @available(iOS 26.0, *)
-    static func generativeTags(for page: Page) async -> [String]? {
-        guard case .available = SystemLanguageModel.default.availability else { return nil }
-
+    static func generativeTags(for page: Page, session: LanguageModelSession) async -> [String]? {
         let content = ([page.title] + page.paragraphs
             .sorted { $0.sortOrder < $1.sortOrder }
             .map(\.text))
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty else { return nil }
-
-        let session = LanguageModelSession(
-            instructions: """
-            You classify short personal notes into 1-2 tags from a fixed set: \
-            to-do, idea, project, journal, goal. Pick only tags that clearly \
-            apply; don't force a fit.
-            """
-        )
 
         do {
             let response = try await session.respond(
@@ -204,6 +249,35 @@ enum NoteAnalyzer {
             )
             let tags = response.content.tags
             return tags.isEmpty ? nil : tags
+        } catch {
+            return nil
+        }
+    }
+
+    /// Extracts concrete action items from a note as a structured list,
+    /// using the same `@Generable`-constrained approach as `generativeTags`.
+    /// There's no non-LLM fallback for this one — pulling actionable tasks
+    /// out of freeform prose isn't something the keyword heuristics can do
+    /// credibly, so callers should just treat nil/empty as "nothing to
+    /// suggest" rather than degrading to a simpler heuristic.
+    @available(iOS 26.0, *)
+    static func extractActionItems(for page: Page, session: LanguageModelSession) async -> [String]? {
+        let content = ([page.title] + page.paragraphs
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map(\.text))
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else { return nil }
+
+        do {
+            let response = try await session.respond(
+                to: "Extract any concrete action items from this note:\n\n\(content)",
+                generating: ExtractedActionItems.self
+            )
+            let items = response.content.items
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            return items.isEmpty ? nil : items
         } catch {
             return nil
         }

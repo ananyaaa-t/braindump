@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import FoundationModels
 
 struct PageView: View {
     @Bindable var page: Page
@@ -295,6 +296,10 @@ private struct InfoSheet: View {
     @State private var overviewIsGenerated = false
     @State private var isGeneratingOverview = false
     @State private var tagsAreGenerated = false
+    @State private var aiUnavailableReason: String?
+    @State private var suggestedActionItems: [String] = []
+    @State private var isFindingActionItems = false
+    @State private var didInsertActionItems = false
 
     private var chipColor: Color { page.color.color.darkerTint(by: 0.08) }
 
@@ -304,6 +309,12 @@ private struct InfoSheet: View {
                 lastEditedRow
                 tagsSection
                 overviewSection
+                actionItemsSection
+                if let aiUnavailableReason {
+                    Text(aiUnavailableReason)
+                        .font(AppFont.body(12))
+                        .foregroundStyle(.dune)
+                }
                 Spacer()
             }
             .padding(20)
@@ -324,37 +335,149 @@ private struct InfoSheet: View {
         }
         .tint(.ink)
         .task {
-            await loadTagsIfNeeded()
-            await loadOverview()
+            if #available(iOS 26.0, *) {
+                await loadAllGenerativeContent()
+            } else {
+                aiUnavailableReason = "Apple Intelligence needs iOS 26 or later."
+                isGeneratingOverview = true
+                loadFallbackContent()
+                isGeneratingOverview = false
+            }
         }
         .presentationDetents([.medium])
     }
 
-    /// Tags a page on first view: prefers Apple Intelligence's structured,
-    /// on-device generation, falling back to the local keyword heuristic on
-    /// older OS versions, ineligible devices, or generation failure. Never
-    /// overwrites tags the user already has (or has already added/removed).
-    private func loadTagsIfNeeded() async {
-        guard page.tags.isEmpty else { return }
-        if #available(iOS 26.0, *), let generated = await NoteAnalyzer.generativeTags(for: page) {
-            page.tags = generated
-            tagsAreGenerated = true
-        } else {
+    /// Fallback path used on OS versions below 26, or when the model turns
+    /// out to be unavailable at runtime: keyword-heuristic tags and the
+    /// extractive summarizer. No fallback for action items — see
+    /// `NoteAnalyzer.extractActionItems`.
+    private func loadFallbackContent() {
+        if page.tags.isEmpty {
             page.tags = NoteAnalyzer.suggestedTags(for: page)
             tagsAreGenerated = false
         }
+        overviewText = NoteAnalyzer.summary(for: page)
+        overviewIsGenerated = false
     }
 
-    private func loadOverview() async {
+    /// Drives tags, overview, and action-item suggestions off of one shared,
+    /// prewarmed `LanguageModelSession` (see `NoteAnalyzer.makeSession`)
+    /// instead of a session per call. Falls back to the heuristics (and
+    /// explains why, via `aiUnavailableReason`) if the model isn't actually
+    /// usable despite the OS supporting it in principle.
+    @available(iOS 26.0, *)
+    private func loadAllGenerativeContent() async {
+        let availability = SystemLanguageModel.default.availability
+        guard case .available = availability else {
+            aiUnavailableReason = NoteAnalyzer.unavailabilityMessage(for: availability)
+            isGeneratingOverview = true
+            loadFallbackContent()
+            isGeneratingOverview = false
+            return
+        }
+
+        let session = NoteAnalyzer.makeSession()
+
+        if page.tags.isEmpty {
+            if let generated = await NoteAnalyzer.generativeTags(for: page, session: session) {
+                page.tags = generated
+                tagsAreGenerated = true
+            } else {
+                page.tags = NoteAnalyzer.suggestedTags(for: page)
+                tagsAreGenerated = false
+                noteGenerationFailure()
+            }
+        }
+
         isGeneratingOverview = true
-        if #available(iOS 26.0, *), let generated = await NoteAnalyzer.generativeOverview(for: page) {
+        if let generated = await NoteAnalyzer.generativeOverview(for: page, session: session) {
             overviewText = generated
             overviewIsGenerated = true
         } else {
             overviewText = NoteAnalyzer.summary(for: page)
             overviewIsGenerated = false
+            noteGenerationFailure()
         }
         isGeneratingOverview = false
+
+        isFindingActionItems = true
+        suggestedActionItems = await NoteAnalyzer.extractActionItems(for: page, session: session) ?? []
+        isFindingActionItems = false
+    }
+
+    /// Surfaces an explanation the first time a generative call comes back
+    /// nil despite `SystemLanguageModel.default.availability` reporting
+    /// `.available` — e.g. the on-device content-safety model asset isn't
+    /// actually loadable (a real, observed Simulator failure mode:
+    /// `FoundationModels.LanguageModelSession.GenerationError` wrapping a
+    /// `ModelManagerServices.ModelManagerError`). Without this, a page just
+    /// silently shows the same heuristic output as when Apple Intelligence
+    /// is unavailable, with no indication anything went wrong.
+    private func noteGenerationFailure() {
+        guard aiUnavailableReason == nil else { return }
+        aiUnavailableReason = "Apple Intelligence didn't respond just now, so this is showing simpler, offline suggestions instead."
+    }
+
+    /// Appends the suggested action items to the page as new (unchecked)
+    /// checklist paragraphs and bumps `updatedAt` so `RichTextEditor`
+    /// notices the model changed underneath it and rebuilds from it the
+    /// next time this sheet is dismissed.
+    private func addActionItemsToPage() {
+        let existing = page.paragraphs.sorted { $0.sortOrder < $1.sortOrder }
+        var nextOrder = (existing.last?.sortOrder ?? -1) + 1
+        for item in suggestedActionItems {
+            let paragraph = Paragraph(text: item, kind: .checklist, style: .body, isChecked: false, sortOrder: nextOrder)
+            paragraph.page = page
+            page.paragraphs.append(paragraph)
+            nextOrder += 1
+        }
+        page.updatedAt = .now
+        suggestedActionItems = []
+        didInsertActionItems = true
+    }
+
+    @ViewBuilder
+    private var actionItemsSection: some View {
+        if isFindingActionItems {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("action items · on-device AI")
+                    .font(AppFont.body(11))
+                    .foregroundStyle(.dune)
+                Text("looking…")
+                    .font(AppFont.body(15))
+                    .foregroundStyle(.dune)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(chipColor)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        } else if !suggestedActionItems.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("action items · on-device AI")
+                    .font(AppFont.body(11))
+                    .foregroundStyle(.dune)
+                ForEach(suggestedActionItems, id: \.self) { item in
+                    Text("•  \(item)")
+                        .font(AppFont.body(14))
+                        .foregroundStyle(.ink)
+                }
+                Button {
+                    addActionItemsToPage()
+                } label: {
+                    Label("Add to page as checklist", systemImage: "checklist")
+                        .font(AppFont.body(13))
+                }
+                .padding(.top, 2)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(chipColor)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        } else if didInsertActionItems {
+            Text("Added to page.")
+                .font(AppFont.body(12))
+                .foregroundStyle(.dune)
+        }
     }
 
     private var lastEditedRow: some View {
