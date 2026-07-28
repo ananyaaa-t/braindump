@@ -12,6 +12,20 @@ enum NoteTag: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Structured output schema for `NoteAnalyzer.generativeTags`. Constrains the
+/// model to 1-2 tags drawn from the same vocabulary as `NoteTag`, so callers
+/// can treat generated and keyword-heuristic tags interchangeably.
+@available(iOS 26.0, *)
+@Generable
+struct GeneratedTags {
+    @Guide(
+        description: "The 1-2 tags that best classify this note.",
+        .count(1...2),
+        .element(.anyOf(["to-do", "idea", "project", "journal", "goal"]))
+    )
+    var tags: [String]
+}
+
 enum NoteAnalyzer {
     private static let sentenceEmbedding = NLEmbedding.sentenceEmbedding(for: .english)
 
@@ -154,6 +168,42 @@ enum NoteAnalyzer {
             let response = try await session.respond(to: "Summarize this note:\n\n\(content)")
             let text = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
             return text.isEmpty ? nil : text
+        } catch {
+            return nil
+        }
+    }
+
+    /// Generates 1-2 structured tags using Apple's on-device Foundation
+    /// Models, constrained to the same vocabulary as the keyword-based
+    /// `suggestedTags(for:)`. Returns nil on unsupported OS versions,
+    /// ineligible devices, or if generation fails for any reason — callers
+    /// should fall back to `suggestedTags(for:)` in that case.
+    @available(iOS 26.0, *)
+    static func generativeTags(for page: Page) async -> [String]? {
+        guard case .available = SystemLanguageModel.default.availability else { return nil }
+
+        let content = ([page.title] + page.paragraphs
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map(\.text))
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else { return nil }
+
+        let session = LanguageModelSession(
+            instructions: """
+            You classify short personal notes into 1-2 tags from a fixed set: \
+            to-do, idea, project, journal, goal. Pick only tags that clearly \
+            apply; don't force a fit.
+            """
+        )
+
+        do {
+            let response = try await session.respond(
+                to: "Classify this note:\n\n\(content)",
+                generating: GeneratedTags.self
+            )
+            let tags = response.content.tags
+            return tags.isEmpty ? nil : tags
         } catch {
             return nil
         }

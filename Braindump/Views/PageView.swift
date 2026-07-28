@@ -294,6 +294,7 @@ private struct InfoSheet: View {
     @State private var overviewText: String?
     @State private var overviewIsGenerated = false
     @State private var isGeneratingOverview = false
+    @State private var tagsAreGenerated = false
 
     private var chipColor: Color { page.color.color.darkerTint(by: 0.08) }
 
@@ -322,15 +323,26 @@ private struct InfoSheet: View {
             .toolbarBackground(page.color.color, for: .navigationBar)
         }
         .tint(.ink)
-        .onAppear {
-            if page.tags.isEmpty {
-                page.tags = NoteAnalyzer.suggestedTags(for: page)
-            }
-        }
         .task {
+            await loadTagsIfNeeded()
             await loadOverview()
         }
         .presentationDetents([.medium])
+    }
+
+    /// Tags a page on first view: prefers Apple Intelligence's structured,
+    /// on-device generation, falling back to the local keyword heuristic on
+    /// older OS versions, ineligible devices, or generation failure. Never
+    /// overwrites tags the user already has (or has already added/removed).
+    private func loadTagsIfNeeded() async {
+        guard page.tags.isEmpty else { return }
+        if #available(iOS 26.0, *), let generated = await NoteAnalyzer.generativeTags(for: page) {
+            page.tags = generated
+            tagsAreGenerated = true
+        } else {
+            page.tags = NoteAnalyzer.suggestedTags(for: page)
+            tagsAreGenerated = false
+        }
     }
 
     private func loadOverview() async {
@@ -363,7 +375,7 @@ private struct InfoSheet: View {
 
     private var tagsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("tags")
+            Text(tagsAreGenerated ? "tags · on-device AI" : "tags")
                 .font(AppFont.body(11))
                 .foregroundStyle(.dune)
 
@@ -379,6 +391,7 @@ private struct InfoSheet: View {
                                 Text(tag)
                                 Button {
                                     page.tags.removeAll { $0 == tag }
+                                    tagsAreGenerated = false
                                 } label: {
                                     Image(systemName: "xmark")
                                         .font(.system(size: 9, weight: .medium))
@@ -400,7 +413,10 @@ private struct InfoSheet: View {
             if !remaining.isEmpty {
                 Menu {
                     ForEach(remaining, id: \.self) { tag in
-                        Button(tag) { page.tags.append(tag) }
+                        Button(tag) {
+                            page.tags.append(tag)
+                            tagsAreGenerated = false
+                        }
                     }
                 } label: {
                     Label("add tag", systemImage: "plus")
