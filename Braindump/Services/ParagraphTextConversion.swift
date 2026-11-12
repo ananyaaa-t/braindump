@@ -1,6 +1,5 @@
 import Foundation
 import UIKit
-import SwiftUI
 
 /// Literal marker characters prefixed onto a paragraph's line so bullets and
 /// checklists are plain text content (not separate UI controls) inside one
@@ -42,8 +41,36 @@ enum ParagraphAttributedText {
     static let hangingIndent: CGFloat = 22
     static let checklistMarkerFontSize: CGFloat = 20
 
+    /// A custom attribute recording which logical `ParagraphStyle` a run of
+    /// text was built with, independent of the actual rendered font point
+    /// size. `parseLines(from:)` (here) and `RichTextEditor`'s
+    /// `currentParagraphStyle()` both used to infer style by comparing the
+    /// live UIFont's `pointSize` back against `ParagraphStyle.fontSize` --
+    /// that only worked because point size was otherwise a fixed, 1:1 stand-
+    /// in for style. Once `font(kind:style:bold:italic:)` started scaling
+    /// sizes for Dynamic Type (see below), the *rendered* point size varies
+    /// with the user's system Text Size setting, so comparing it against a
+    /// fixed reference would misclassify headings/subheadings as body text
+    /// at any non-default text size. Tagging the style explicitly sidesteps
+    /// that fragility entirely rather than trying to replicate the scaling
+    /// math in two places to keep them in sync.
+    static let styleAttributeKey = NSAttributedString.Key("com.athapar.braindump.paragraphStyle")
+
+    /// Dynamic Type reference text style used to scale each `ParagraphStyle`
+    /// — chosen for roughly matching visual prominence, not an exact size
+    /// match, since `UIFontMetrics` scales relative to the base size passed
+    /// in rather than snapping to the system's own default point sizes.
+    private static func textStyle(for style: ParagraphStyle) -> UIFont.TextStyle {
+        switch style {
+        case .heading: return .title2
+        case .subheading: return .title3
+        case .body: return .body
+        }
+    }
+
     static func font(kind: ParagraphKind, style: ParagraphStyle, bold: Bool = false, italic: Bool = false) -> UIFont {
-        let size = kind == .text ? style.fontSize : ParagraphStyle.body.fontSize
+        let effectiveStyle = kind == .text ? style : .body
+        let size = effectiveStyle.fontSize
         let baseName = italic ? "EBGaramond-Italic" : "EBGaramond-Regular"
         var resolved = UIFont(name: baseName, size: size) ?? .systemFont(ofSize: size)
         if bold {
@@ -55,7 +82,7 @@ enum ParagraphAttributedText {
                 resolved = UIFont(descriptor: descriptor, size: size)
             }
         }
-        return resolved
+        return UIFontMetrics(forTextStyle: textStyle(for: effectiveStyle)).scaledFont(for: resolved)
     }
 
     static func paragraphStyle(kind: ParagraphKind) -> NSMutableParagraphStyle {
@@ -70,10 +97,12 @@ enum ParagraphAttributedText {
     }
 
     static func baseAttributes(kind: ParagraphKind, style: ParagraphStyle) -> [NSAttributedString.Key: Any] {
-        [
+        let effectiveStyle = kind == .text ? style : .body
+        return [
             .font: font(kind: kind, style: style),
-            .foregroundColor: UIColor(Color.ink),
+            .foregroundColor: AppUIColor.ink,
             .paragraphStyle: paragraphStyle(kind: kind),
+            styleAttributeKey: effectiveStyle.rawValue,
         ]
     }
 
@@ -129,7 +158,8 @@ enum ParagraphAttributedText {
         let textLength = (text as NSString).length
 
         if kind == .checklist, !marker.isEmpty {
-            let glyphFont = UIFont(name: "EBGaramond-Regular", size: checklistMarkerFontSize) ?? .systemFont(ofSize: checklistMarkerFontSize)
+            let baseGlyphFont = UIFont(name: "EBGaramond-Regular", size: checklistMarkerFontSize) ?? .systemFont(ofSize: checklistMarkerFontSize)
+            let glyphFont = UIFontMetrics(forTextStyle: .body).scaledFont(for: baseGlyphFont)
             line.addAttribute(.font, value: glyphFont, range: NSRange(location: 0, length: 1))
         }
 
@@ -138,7 +168,7 @@ enum ParagraphAttributedText {
             if range.length > 0 {
                 line.addAttributes([
                     .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                    .foregroundColor: UIColor(Color.dune),
+                    .foregroundColor: AppUIColor.dune,
                 ], range: range)
             }
         }
@@ -190,9 +220,17 @@ enum ParagraphAttributedText {
             guard let substring else { return }
             let stripped = ParagraphMarker.stripMarker(from: substring)
             var style: ParagraphStyle = .body
-            if stripped.kind == .text, substringRange.length > 0,
-               let font = attributedText.attribute(.font, at: substringRange.location, effectiveRange: nil) as? UIFont {
-                style = ParagraphStyle.allCases.first { abs($0.fontSize - font.pointSize) < 0.5 } ?? .body
+            if stripped.kind == .text, substringRange.length > 0 {
+                // Prefer the explicit style tag (works regardless of Dynamic
+                // Type scaling); fall back to the old point-size comparison
+                // only if some run somehow lacks the tag (e.g. text pasted
+                // in from outside this attributed-string pipeline).
+                if let tag = attributedText.attribute(styleAttributeKey, at: substringRange.location, effectiveRange: nil) as? String,
+                   let tagged = ParagraphStyle(rawValue: tag) {
+                    style = tagged
+                } else if let font = attributedText.attribute(.font, at: substringRange.location, effectiveRange: nil) as? UIFont {
+                    style = ParagraphStyle.allCases.first { abs($0.fontSize - font.pointSize) < 0.5 } ?? .body
+                }
             }
 
             let markerLength = ParagraphMarker.markerLength(for: stripped.kind, isChecked: stripped.isChecked)

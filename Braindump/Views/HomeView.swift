@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 extension Notification.Name {
     static let pageSoftDeleted = Notification.Name("pageSoftDeleted")
@@ -7,14 +8,14 @@ extension Notification.Name {
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query private var allPages: [Page]
     @AppStorage("hasManualPageOrder") private var hasManualOrder = false
     @State private var searchText = ""
-    @State private var isSearching = false
     @State private var undoToastPage: Page?
     @State private var undoDismissTask: Task<Void, Never>?
     @State private var showingRecentlyDeleted = false
-    @FocusState private var searchFieldFocused: Bool
+    @State private var draggingPage: Page?
 
     init() {}
 
@@ -26,51 +27,71 @@ struct HomeView: View {
         allPages.filter(\.isTrashed)
     }
 
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
+    }
+
     var body: some View {
         NavigationStack {
-            Group {
-                if pages.isEmpty {
-                    emptyState
-                } else if isSearching, filteredPages.isEmpty {
-                    noResultsState
-                } else {
-                    List {
-                        ForEach(isSearching ? filteredPages : orderedPages) { page in
-                            NavigationLink(value: page) {
-                                PageRow(page: page)
-                            }
-                            .buttonStyle(.plain)
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    softDelete(page)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        header
+                        searchField
+
+                        if pages.isEmpty {
+                            emptyState
+                        } else if isSearching, filteredPages.isEmpty {
+                            noResultsState
+                        } else {
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(isSearching ? filteredPages : orderedPages) { page in
+                                    NavigationLink(value: page) {
+                                        NoteCard(page: page)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            softDelete(page)
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
+                                    .opacity(draggingPage?.persistentModelID == page.persistentModelID ? 0.5 : 1)
+                                    .onDrag {
+                                        draggingPage = page
+                                        return NSItemProvider(object: page.uuid.uuidString as NSString)
+                                    }
+                                    .onDrop(
+                                        of: [.text],
+                                        delegate: PageGridDropDelegate(
+                                            target: page,
+                                            draggingPage: $draggingPage,
+                                            orderedPages: orderedPages,
+                                            onCommit: { hasManualOrder = true }
+                                        )
+                                    )
                                 }
                             }
-                        }
-                        .onMove(perform: isSearching ? nil : movePages)
 
-                        if !isSearching, !recentlyDeletedPages.isEmpty {
-                            recentlyDeletedRow
+                            if !recentlyDeletedPages.isEmpty {
+                                recentlyDeletedRow
+                            }
                         }
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                     .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    .padding(.bottom, 100)
                 }
+                .scrollDismissesKeyboard(.interactively)
+
+                fab
             }
             .background(Color.paper)
-            .safeAreaInset(edge: .top) {
-                VStack(spacing: 0) {
-                    header
-                    if isSearching {
-                        searchField
-                    }
-                }
-            }
             .safeAreaInset(edge: .bottom) {
                 if let undoToastPage {
                     undoToast(for: undoToastPage)
@@ -94,95 +115,104 @@ struct HomeView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("your pages")
-                .font(AppFont.display(34))
-                .foregroundStyle(.ink)
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Braindump")
+                    .font(AppFont.display(32))
+                    .foregroundStyle(.ink)
+
+                Text("\(pages.count) note\(pages.count == 1 ? "" : "s")")
+                    .font(AppFont.body(13))
+                    .foregroundStyle(.dune)
+            }
 
             Spacer()
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isSearching.toggle()
-                    if !isSearching { searchText = "" }
-                }
-                searchFieldFocused = isSearching
-            } label: {
-                Image(systemName: isSearching ? "xmark" : "magnifyingglass")
-                    .font(.system(size: 17, weight: .light))
-                    .foregroundStyle(.dune)
-            }
-            .accessibilityLabel(isSearching ? "Close search" : "Search pages")
-
-            Button(action: addPage) {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .light))
-                    .foregroundStyle(.dune)
-            }
-            .accessibilityLabel("New page")
+            avatarBadge
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(Color.paper)
+    }
+
+    private var avatarBadge: some View {
+        Image("BrandMark")
+            .resizable()
+            .scaledToFill()
+            .frame(width: 40, height: 40)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.hairline, lineWidth: 1)
+            }
+            .accessibilityHidden(true)
     }
 
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .light))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.dune)
-            TextField("search your pages", text: $searchText)
-                .font(AppFont.body(16))
+            TextField("Search notes…", text: $searchText)
+                .font(AppFont.body(14))
                 .foregroundStyle(.ink)
-                .focused($searchFieldFocused)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.hairline.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .padding(.horizontal, 20)
-        .padding(.bottom, 10)
-        .background(Color.paper)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.hairline.opacity(0.5))
+        )
+    }
+
+    private var fab: some View {
+        Button(action: addPage) {
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.brandAccent)
+                )
+                .shadow(color: Color.brandAccent.opacity(0.45), radius: 16, y: 8)
+        }
+        .padding(.trailing, 20)
+        .padding(.bottom, 24)
+        .accessibilityLabel("New page")
     }
 
     private var emptyState: some View {
         VStack(spacing: 6) {
-            Text("no pages yet")
-                .font(AppFont.display(24))
+            Text("No pages yet")
+                .font(AppFont.display(22))
                 .foregroundStyle(.ink)
-            Text("tap + to start one")
-                .font(AppFont.body(15))
+            Text("Tap + to start one")
+                .font(AppFont.body(14))
                 .foregroundStyle(.dune)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, minHeight: 200, alignment: .center)
     }
 
     private var noResultsState: some View {
         VStack(spacing: 6) {
-            Text("no matches")
-                .font(AppFont.display(24))
+            Text("No matches")
+                .font(AppFont.display(22))
                 .foregroundStyle(.ink)
-            Text("try a different search")
-                .font(AppFont.body(15))
+            Text("Try a different search")
+                .font(AppFont.body(14))
                 .foregroundStyle(.dune)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, minHeight: 200, alignment: .center)
     }
 
     private var recentlyDeletedRow: some View {
         Button {
             showingRecentlyDeleted = true
         } label: {
-            Text("recently deleted (\(recentlyDeletedPages.count))")
+            Text("Recently deleted (\(recentlyDeletedPages.count))")
                 .font(AppFont.body(13))
                 .foregroundStyle(.dune)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 14)
         }
-        .listRowInsets(EdgeInsets())
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
     }
 
     private func undoToast(for page: Page) -> some View {
@@ -200,9 +230,8 @@ struct HomeView: View {
                 undoToastPage = nil
             } label: {
                 Text("Undo")
-                    .font(AppFont.body(14))
+                    .font(AppFont.bodyBold(14))
                     .foregroundStyle(.ink)
-                    .fontWeight(.semibold)
             }
         }
         .padding(.horizontal, 16)
@@ -225,34 +254,30 @@ struct HomeView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return orderedPages }
 
+        let lowered = query.lowercased()
+        let literalMatches = orderedPages.filter { page in
+            page.title.lowercased().contains(lowered)
+                || page.paragraphs.contains { $0.text.lowercased().contains(lowered) }
+        }
         let scored = orderedPages.compactMap { page -> (Page, Double)? in
             NoteAnalyzer.searchDistance(page: page, query: query).map { (page, $0) }
         }
 
         if scored.count == orderedPages.count {
-            return scored.sorted { $0.1 < $1.1 }.filter { $0.1 < 1.1 }.map(\.0)
+            let literalIDs = Set(literalMatches.map(\.persistentModelID))
+            let semanticMatches = scored.sorted { $0.1 < $1.1 }
+                .filter { $0.1 < 1.1 && !literalIDs.contains($0.0.persistentModelID) }
+                .map(\.0)
+            return literalMatches + semanticMatches
         }
 
-        let lowered = query.lowercased()
-        return orderedPages.filter { page in
-            page.title.lowercased().contains(lowered)
-                || page.paragraphs.contains { $0.text.lowercased().contains(lowered) }
-        }
+        return literalMatches
     }
 
     private func addPage() {
         let lowestSortOrder = pages.map(\.sortOrder).min() ?? 0
         let page = Page(sortOrder: lowestSortOrder - 1)
         modelContext.insert(page)
-    }
-
-    private func movePages(from source: IndexSet, to destination: Int) {
-        var reordered = orderedPages
-        reordered.move(fromOffsets: source, toOffset: destination)
-        for (index, page) in reordered.enumerated() {
-            page.sortOrder = index
-        }
-        hasManualOrder = true
     }
 
     private func softDelete(_ page: Page) {
@@ -281,37 +306,112 @@ struct HomeView: View {
     }
 }
 
-private struct PageRow: View {
+/// Drives drag-to-reorder for the home screen's note card grid: as the
+/// dragged card hovers over another, moves it to that position in a local
+/// snapshot of `orderedPages` and immediately writes back `sortOrder` on
+/// the affected models, so `@Query`'s live result re-sorts to match while
+/// the drag is still in progress (mirroring the reordering feel `List`'s
+/// built-in `onMove` gave for free, which isn't available on `LazyVGrid`).
+private struct PageGridDropDelegate: DropDelegate {
+    let target: Page
+    @Binding var draggingPage: Page?
+    let orderedPages: [Page]
+    let onCommit: () -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingPage,
+              draggingPage.persistentModelID != target.persistentModelID,
+              let fromIndex = orderedPages.firstIndex(where: { $0.persistentModelID == draggingPage.persistentModelID }),
+              let toIndex = orderedPages.firstIndex(where: { $0.persistentModelID == target.persistentModelID })
+        else { return }
+
+        var reordered = orderedPages
+        reordered.move(
+            fromOffsets: IndexSet(integer: fromIndex),
+            toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex
+        )
+        for (index, page) in reordered.enumerated() where page.sortOrder != index {
+            page.sortOrder = index
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingPage = nil
+        onCommit()
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+}
+
+/// A single note on the home screen's grid: a colored "sticky note" card
+/// tinted per `page.color`, with an optional tag chip, title, preview
+/// snippet, and relative timestamp -- all text tinted to the card's own
+/// color (`page.color.textColor`) rather than the app-wide neutral ink.
+private struct NoteCard: View {
     let page: Page
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                Circle()
-                    .fill(page.color.color)
-                    .frame(width: 12, height: 12)
-                    .padding(.top, 6)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(page.title.isEmpty ? "untitled" : page.title)
-                        .font(AppFont.display(20))
-                        .foregroundStyle(.ink)
-
-                    Text(page.previewText)
-                        .font(AppFont.body(15))
-                        .foregroundStyle(.dune)
-                        .lineLimit(1)
+        VStack(alignment: .leading, spacing: 6) {
+            if let tag = page.tags.first {
+                HStack {
+                    Spacer(minLength: 0)
+                    tagChip(tag)
                 }
-
-                Spacer()
             }
-            .padding(.vertical, 14)
 
-            Rectangle()
-                .fill(Color.hairline)
-                .frame(height: 0.5)
+            Text(page.title.isEmpty ? "Untitled" : page.title)
+                .font(AppFont.display(15))
+                .foregroundStyle(page.color.textColor)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(page.previewText)
+                .font(AppFont.body(12))
+                .foregroundStyle(page.color.textColor.opacity(0.75))
+                .lineLimit(3)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 4)
+
+            Text(Self.timeAgo(page.updatedAt))
+                .font(AppFont.body(10))
+                .foregroundStyle(page.color.textColor.opacity(0.5))
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(page.color.color)
+        )
+        .shadow(color: page.color.textColor.opacity(0.18), radius: 12, y: 4)
+    }
+
+    private func tagChip(_ tag: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: "sparkle")
+                .font(.system(size: 8, weight: .bold))
+            Text(tag.capitalized)
+                .font(AppFont.bodyBold(10))
+        }
+        .foregroundStyle(page.color.textColor)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(Color.white.opacity(0.45)))
+    }
+
+    private static func timeAgo(_ date: Date) -> String {
+        let minutes = max(0, Int(Date.now.timeIntervalSince(date) / 60))
+        if minutes < 1 { return "just now" }
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h ago" }
+        return "\(hours / 24)d ago"
     }
 }
 

@@ -7,12 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		073D086AF877D7E4C7985253 /* BraindumpUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F8CA0C62017F67012C8A56A /* BraindumpUITests.swift */; };
 		08FB758757371B558DCE6AB9 /* PageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008A9D8C66700DD4F1DCFB90 /* PageView.swift */; };
 		09490E6862F690FD41BBD7CE /* BraindumpWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D75D29DC0CF523CAEF614E8 /* BraindumpWidgetBundle.swift */; };
 		1CDC085E7FEFB60BF31D5F00 /* BraindumpWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FBFB48948BAF61D19855D145 /* BraindumpWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		272444013321704754FD0AC4 /* ParagraphTextConversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 158511B83D0E75E3E1030C23 /* ParagraphTextConversion.swift */; };
 		2FBAEDFD3A6F36623EC1AE0D /* CormorantGaramond-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9CF7C9D98147D8923707D7B3 /* CormorantGaramond-Italic.ttf */; };
 		354C76F065D13D56700F7717 /* VoiceRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542F969B048909C81FF2B154 /* VoiceRecorder.swift */; };
+		3FA27C7525D8EDD9DA9070BF /* EditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED170F0C00D5C4B8A2A29F88 /* EditorTests.swift */; };
 		41EA5BCE7C0C197BE3A2BD8A /* EBGaramond-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B69D0FE3E6E77F9653016796 /* EBGaramond-Regular.ttf */; };
 		47BB4485310B6F3D8C8B9D46 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD8D218211B300B47DAD489 /* RichTextEditor.swift */; };
 		560C43D9944F50D33F279F22 /* NoteAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF3364A69D0B376034FE835 /* NoteAnalyzer.swift */; };
@@ -38,12 +40,26 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		3C0380339BBA269942923D59 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 08AAD9490EB5E4213BB67FAF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0E627447305797C7D00CE6CE;
+			remoteInfo = Braindump;
+		};
 		9546E8A6B4169F392620055E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 08AAD9490EB5E4213BB67FAF /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 194CFDBF4300FE4AD5D75381;
 			remoteInfo = BraindumpWidgetExtension;
+		};
+		C7F828DB11F3B21E15CD336E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 08AAD9490EB5E4213BB67FAF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0E627447305797C7D00CE6CE;
+			remoteInfo = Braindump;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -74,18 +90,22 @@
 		4D3876D71E542F3193A2B88C /* RecentlyDeletedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentlyDeletedView.swift; sourceTree = "<group>"; };
 		542F969B048909C81FF2B154 /* VoiceRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecorder.swift; sourceTree = "<group>"; };
 		54949C3F631C563E5DBDE1B4 /* SharedModelContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedModelContainer.swift; sourceTree = "<group>"; };
+		5F8CA0C62017F67012C8A56A /* BraindumpUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BraindumpUITests.swift; sourceTree = "<group>"; };
 		60711967640AFC93F03E6DC4 /* Colors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Colors.swift; sourceTree = "<group>"; };
 		695EAB2725E1224F48ADB2FB /* SelectPageIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectPageIntent.swift; sourceTree = "<group>"; };
 		6C6A2688C5FCEE9DE6E85F81 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		6E1AD2D7FA3E93FB0769A31B /* EBGaramond-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "EBGaramond-Italic.ttf"; sourceTree = "<group>"; };
 		786EB6B52522B43E5FB4A13D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8DE682CDE491F41A8E6058FF /* BraindumpWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BraindumpWidget.entitlements; sourceTree = "<group>"; };
+		8FEF6DC7A8982B7D311EFB25 /* BraindumpTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BraindumpTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		93614B694E013EB901E5CBF2 /* BraindumpApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BraindumpApp.swift; sourceTree = "<group>"; };
 		9CF7C9D98147D8923707D7B3 /* CormorantGaramond-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CormorantGaramond-Italic.ttf"; sourceTree = "<group>"; };
 		B69D0FE3E6E77F9653016796 /* EBGaramond-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "EBGaramond-Regular.ttf"; sourceTree = "<group>"; };
 		BBF3364A69D0B376034FE835 /* NoteAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteAnalyzer.swift; sourceTree = "<group>"; };
+		CBBDCA916AC0F0E7B906FB99 /* BraindumpUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BraindumpUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC59852CE53C996A350E14E9 /* Page.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Page.swift; sourceTree = "<group>"; };
 		CCD135AD9BA3712FC4422755 /* BraindumpWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BraindumpWidget.swift; sourceTree = "<group>"; };
+		ED170F0C00D5C4B8A2A29F88 /* EditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTests.swift; sourceTree = "<group>"; };
 		FBFB48948BAF61D19855D145 /* BraindumpWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BraindumpWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -102,6 +122,8 @@
 			isa = PBXGroup;
 			children = (
 				8A7E607A79A825E43537E54C /* Braindump */,
+				FEAD1D04BBD31E8342AFE730 /* BraindumpTests */,
+				CEEB2F75F5FDBD21947951B3 /* BraindumpUITests */,
 				676C042C6947A900D1AC1AB3 /* BraindumpWidget */,
 				2F89BE318B976176A23E956D /* Products */,
 			);
@@ -111,6 +133,8 @@
 			isa = PBXGroup;
 			children = (
 				241E9296BCA8D7BBB4928F4C /* Braindump.app */,
+				8FEF6DC7A8982B7D311EFB25 /* BraindumpTests.xctest */,
+				CBBDCA916AC0F0E7B906FB99 /* BraindumpUITests.xctest */,
 				FBFB48948BAF61D19855D145 /* BraindumpWidgetExtension.appex */,
 			);
 			name = Products;
@@ -185,6 +209,22 @@
 			path = DesignSystem;
 			sourceTree = "<group>";
 		};
+		CEEB2F75F5FDBD21947951B3 /* BraindumpUITests */ = {
+			isa = PBXGroup;
+			children = (
+				5F8CA0C62017F67012C8A56A /* BraindumpUITests.swift */,
+			);
+			path = BraindumpUITests;
+			sourceTree = "<group>";
+		};
+		FEAD1D04BBD31E8342AFE730 /* BraindumpTests */ = {
+			isa = PBXGroup;
+			children = (
+				ED170F0C00D5C4B8A2A29F88 /* EditorTests.swift */,
+			);
+			path = BraindumpTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -226,6 +266,42 @@
 			productReference = FBFB48948BAF61D19855D145 /* BraindumpWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		60E5647E1750AE74B8554F5D /* BraindumpUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0893C3A9E0A99BCEFFFA4879 /* Build configuration list for PBXNativeTarget "BraindumpUITests" */;
+			buildPhases = (
+				7263573384573BC9775F4743 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D58E3263AE12A94BC43FE073 /* PBXTargetDependency */,
+			);
+			name = BraindumpUITests;
+			packageProductDependencies = (
+			);
+			productName = BraindumpUITests;
+			productReference = CBBDCA916AC0F0E7B906FB99 /* BraindumpUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		EE524CC5725838EB63EC2C49 /* BraindumpTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5272213908CA2B713334DEA1 /* Build configuration list for PBXNativeTarget "BraindumpTests" */;
+			buildPhases = (
+				BC9963E783719BAF07C0C28D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B9239ED526F9CDFEA1CCC878 /* PBXTargetDependency */,
+			);
+			name = BraindumpTests;
+			packageProductDependencies = (
+			);
+			productName = BraindumpTests;
+			productReference = 8FEF6DC7A8982B7D311EFB25 /* BraindumpTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -235,6 +311,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					60E5647E1750AE74B8554F5D = {
+						TestTargetID = 0E627447305797C7D00CE6CE;
+					};
 				};
 			};
 			buildConfigurationList = 9FF64648EAEFC3207300A5BE /* Build configuration list for PBXProject "Braindump" */;
@@ -252,6 +331,8 @@
 			projectRoot = "";
 			targets = (
 				0E627447305797C7D00CE6CE /* Braindump */,
+				EE524CC5725838EB63EC2C49 /* BraindumpTests */,
+				60E5647E1750AE74B8554F5D /* BraindumpUITests */,
 				194CFDBF4300FE4AD5D75381 /* BraindumpWidgetExtension */,
 			);
 		};
@@ -297,6 +378,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7263573384573BC9775F4743 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				073D086AF877D7E4C7985253 /* BraindumpUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC9963E783719BAF07C0C28D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3FA27C7525D8EDD9DA9070BF /* EditorTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F334E7E8D500E4C7F10A8DCB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -323,6 +420,16 @@
 			isa = PBXTargetDependency;
 			target = 194CFDBF4300FE4AD5D75381 /* BraindumpWidgetExtension */;
 			targetProxy = 9546E8A6B4169F392620055E /* PBXContainerItemProxy */;
+		};
+		B9239ED526F9CDFEA1CCC878 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0E627447305797C7D00CE6CE /* Braindump */;
+			targetProxy = C7F828DB11F3B21E15CD336E /* PBXContainerItemProxy */;
+		};
+		D58E3263AE12A94BC43FE073 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0E627447305797C7D00CE6CE /* Braindump */;
+			targetProxy = 3C0380339BBA269942923D59 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -411,6 +518,25 @@
 			};
 			name = Release;
 		};
+		6E8ADE4E3A1ACA44481211FA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.athapar.BraindumpTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Braindump.app/Braindump";
+			};
+			name = Release;
+		};
 		9A2EF1B48561A4E76DE73371 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -488,6 +614,44 @@
 			};
 			name = Release;
 		};
+		BA2F4DB415AB1B15985312C6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.athapar.BraindumpUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Braindump;
+			};
+			name = Release;
+		};
+		C5E44950063B182E8BE5DD25 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.athapar.BraindumpTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Braindump.app/Braindump";
+			};
+			name = Debug;
+		};
 		EFD1E4B8026D88BABAD398CE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -506,6 +670,25 @@
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F8C23EE9037F68D3970961AC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.athapar.BraindumpUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Braindump;
 			};
 			name = Debug;
 		};
@@ -533,11 +716,29 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0893C3A9E0A99BCEFFFA4879 /* Build configuration list for PBXNativeTarget "BraindumpUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F8C23EE9037F68D3970961AC /* Debug */,
+				BA2F4DB415AB1B15985312C6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		2E9977D461B722CBBEC3B80C /* Build configuration list for PBXNativeTarget "BraindumpWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				EFD1E4B8026D88BABAD398CE /* Debug */,
 				FF26B05C3EC6505E42E277D8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5272213908CA2B713334DEA1 /* Build configuration list for PBXNativeTarget "BraindumpTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C5E44950063B182E8BE5DD25 /* Debug */,
+				6E8ADE4E3A1ACA44481211FA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

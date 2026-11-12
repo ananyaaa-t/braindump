@@ -1,36 +1,89 @@
 import SwiftUI
 
-extension Color {
-    static let paper = Color(hex: "#FAF6EE")
+/// Raw dynamic-provider `UIColor`s, for UIKit code (the rich text editor's
+/// `NSAttributedString` attributes, `UITextView.tintColor`) that needs a
+/// color guaranteed to resolve correctly against the current trait
+/// collection at draw/render time. Converting a SwiftUI `Color` back to
+/// `UIColor` outside of a View's body (as `RichTextEditor`/
+/// `ParagraphAttributedText` do, since they're plain UIKit/model code, not
+/// SwiftUI view bodies) isn't guaranteed to preserve the light/dark
+/// adaptive behavior, so UIKit call sites should reference these directly
+/// instead of round-tripping through `Color`.
+enum AppUIColor {
+    static let ink = UIColor.adaptive(light: "#453F37", dark: "#EBDFCE")
+    static let dune = UIColor.adaptive(light: "#A8998A", dark: "#AD9E8E")
+}
 
-    static let butter = Color(hex: "#F6E8C9")
-    static let blush = Color(hex: "#ECD8D4")
-    static let sage = Color(hex: "#D6DEC7")
-    static let sky = Color(hex: "#D3E0E8")
-    static let lilac = Color(hex: "#E0D8E9")
-    static let clay = Color(hex: "#E7D5CA")
-    static let moss = Color(hex: "#C3D3BB")
-    static let stone = Color(hex: "#E1DBD0")
-    static let rose = Color(hex: "#E8D4D7")
-    static let mist = Color(hex: "#D4E2DF")
+extension UIColor {
+    /// Builds a `UIColor` whose resolved color switches on
+    /// `traitCollection.userInterfaceStyle` — the actual mechanism behind
+    /// both `AppUIColor` above and `Color.adaptive(light:dark:)` below.
+    static func adaptive(light: String, dark: String) -> UIColor {
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(hex: dark) : UIColor(hex: light)
+        }
+    }
 
-    static let dune = Color(hex: "#A8998A")
-    static let ink = Color(hex: "#453F37")
-
-    static let hairline = Color(hex: "#E4DFD5")
-
-    init(hex: String) {
+    convenience init(hex: String) {
         var hexString = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         hexString = hexString.replacingOccurrences(of: "#", with: "")
 
         var rgbValue: UInt64 = 0
         Scanner(string: hexString).scanHexInt64(&rgbValue)
 
-        let r = Double((rgbValue & 0xFF0000) >> 16) / 255.0
-        let g = Double((rgbValue & 0x00FF00) >> 8) / 255.0
-        let b = Double(rgbValue & 0x0000FF) / 255.0
+        let r = CGFloat((rgbValue & 0xFF0000) >> 16) / 255.0
+        let g = CGFloat((rgbValue & 0x00FF00) >> 8) / 255.0
+        let b = CGFloat(rgbValue & 0x0000FF) / 255.0
 
-        self.init(red: r, green: g, blue: b)
+        self.init(red: r, green: g, blue: b, alpha: 1)
+    }
+}
+
+extension Color {
+    /// Each pastel keeps its hue but becomes a deeper, more saturated
+    /// "jewel tone" in dark mode, rather than a desaturated, darkened
+    /// version of the light color -- an earlier pass tried the latter and
+    /// it read as muddy/brownish instead of like a deliberate dark palette,
+    /// since these pastels start out with fairly low saturation to begin
+    /// with. `stone` stays comparatively more neutral/muted than the rest,
+    /// matching its subdued role in the light palette. `ink`/`dune`
+    /// (text/icon colors) lighten instead, so contrast against the darker
+    /// backgrounds holds up.
+    static func adaptive(light: String, dark: String) -> Color {
+        Color(uiColor: UIColor.adaptive(light: light, dark: dark))
+    }
+
+    static let paper = Color.adaptive(light: "#FAF6EE", dark: "#21201D")
+
+    // Brightened, more saturated "candy" pastels (each keeps its original
+    // hue/identity so `PageColor` call sites elsewhere don't need to
+    // change) matching a punchier sticky-note-style reference design.
+    static let butter = Color.adaptive(light: "#FFF0C0", dark: "#4C432C")
+    static let blush = Color.adaptive(light: "#FDDDD8", dark: "#4C322C")
+    static let sage = Color.adaptive(light: "#DFF0D0", dark: "#3C4C2C")
+    static let sky = Color.adaptive(light: "#CBE9FC", dark: "#2C404C")
+    static let lilac = Color.adaptive(light: "#E5DCFB", dark: "#3B2C4C")
+    static let clay = Color.adaptive(light: "#FBE0CC", dark: "#4C392C")
+    static let moss = Color.adaptive(light: "#C9E8CE", dark: "#374C2C")
+    static let stone = Color.adaptive(light: "#EDE7DA", dark: "#4C4840")
+    static let rose = Color.adaptive(light: "#FBDCE7", dark: "#4C2C31")
+    static let mist = Color.adaptive(light: "#D2F2E8", dark: "#2C4C46")
+
+    static let dune = Color(uiColor: AppUIColor.dune)
+    static let ink = Color(uiColor: AppUIColor.ink)
+
+    static let hairline = Color.adaptive(light: "#E4DFD5", dark: "#474542")
+
+    /// Terracotta brand accent for the home screen's avatar badge and the
+    /// "new note" floating action button, matching the reference design's
+    /// warm accent color. Kept constant across light/dark rather than
+    /// adaptive since it's a fixed brand color sitting on its own filled
+    /// shape (not directly on the paper background), so contrast against
+    /// its own white glyph doesn't shift with appearance.
+    static let brandAccent = Color(hex: "#D4785A")
+
+    init(hex: String) {
+        self.init(uiColor: UIColor(hex: hex))
     }
 
     func darkerTint(by amount: Double = 0.15) -> Color {
@@ -60,6 +113,7 @@ extension ShapeStyle where Self == Color {
     static var dune: Color { .dune }
     static var ink: Color { .ink }
     static var hairline: Color { .hairline }
+    static var brandAccent: Color { .brandAccent }
 }
 
 enum PageColor: String, CaseIterable, Codable, Identifiable {
@@ -88,6 +142,27 @@ enum PageColor: String, CaseIterable, Codable, Identifiable {
         case .stone: return .stone
         case .rose: return .rose
         case .mist: return .mist
+        }
+    }
+
+    /// A deeper, more saturated tint of each color's own hue, used as the
+    /// title/preview/timestamp text color on home screen note cards so text
+    /// reads as "ink on colored paper" instead of the flat neutral `.ink`
+    /// used elsewhere -- matching the reference design's per-card tinted
+    /// text. Lightened in dark mode for contrast against the darker jewel
+    /// tone backgrounds, same approach as the background colors above.
+    var textColor: Color {
+        switch self {
+        case .butter: return .adaptive(light: "#6B5200", dark: "#F5DFA0")
+        case .blush: return .adaptive(light: "#6B3A35", dark: "#F5C9C0")
+        case .sage: return .adaptive(light: "#3D6B2A", dark: "#C9E8B0")
+        case .sky: return .adaptive(light: "#1A4D6E", dark: "#B8E4FF")
+        case .lilac: return .adaptive(light: "#4A3470", dark: "#D8C9FF")
+        case .clay: return .adaptive(light: "#8A4A20", dark: "#F5C9A0")
+        case .moss: return .adaptive(light: "#2D5E4A", dark: "#B0E8C0")
+        case .stone: return .adaptive(light: "#5C5346", dark: "#E8DFC9")
+        case .rose: return .adaptive(light: "#A03A5C", dark: "#F5B8CE")
+        case .mist: return .adaptive(light: "#1F6E5C", dark: "#B0EBD8")
         }
     }
 }

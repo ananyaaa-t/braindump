@@ -81,8 +81,11 @@ struct RichTextEditor: UIViewRepresentable {
         textView.textContainerInset = .zero
         textView.textContainer.lineFragmentPadding = 0
         textView.delegate = context.coordinator
+        textView.accessibilityLabel = "Page body"
+        textView.accessibilityIdentifier = "page-body"
         textView.attributedText = ParagraphAttributedText.build(from: page.paragraphs)
-        textView.tintColor = UIColor(Color.ink)
+        textView.typingAttributes = ParagraphAttributedText.baseAttributes(kind: .text, style: .body)
+        textView.tintColor = AppUIColor.ink
 
         context.coordinator.textView = textView
 
@@ -143,6 +146,12 @@ struct RichTextEditor: UIViewRepresentable {
         }
     }
 
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard let width = proposal.width, width > 0 else { return nil }
+        let size = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: ceil(size.height))
+    }
+
     @MainActor
     final class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
         var page: Page
@@ -161,7 +170,10 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
-            controller?.hasSelection = textView.selectedRange.length > 0
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let textView else { return }
+                self?.controller?.hasSelection = textView.selectedRange.length > 0
+            }
         }
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
@@ -243,8 +255,17 @@ struct RichTextEditor: UIViewRepresentable {
             guard let textView else { return .body }
             let nsString = textView.attributedText.string as NSString
             let paragraphRange = nsString.paragraphRange(for: textView.selectedRange)
-            guard paragraphRange.length > 0,
-                  let font = textView.attributedText.attribute(.font, at: paragraphRange.location, effectiveRange: nil) as? UIFont else {
+            guard paragraphRange.length > 0 else { return .body }
+
+            // Prefer the explicit style tag (see `ParagraphAttributedText`)
+            // over comparing the rendered font's point size: point size
+            // varies with Dynamic Type scaling, so it's no longer a
+            // reliable stand-in for which named style a paragraph has.
+            if let tag = textView.attributedText.attribute(ParagraphAttributedText.styleAttributeKey, at: paragraphRange.location, effectiveRange: nil) as? String,
+               let tagged = ParagraphStyle(rawValue: tag) {
+                return tagged
+            }
+            guard let font = textView.attributedText.attribute(.font, at: paragraphRange.location, effectiveRange: nil) as? UIFont else {
                 return .body
             }
             return ParagraphStyle.allCases.first { abs($0.fontSize - font.pointSize) < 0.5 } ?? .body
@@ -268,7 +289,12 @@ struct RichTextEditor: UIViewRepresentable {
             guard stripped.kind == .checklist else { return }
 
             let newChecked = !stripped.isChecked
-            let replacement = ParagraphAttributedText.buildLine(kind: .checklist, style: .body, isChecked: newChecked, text: stripped.text)
+            let line = textView.attributedText.attributedSubstring(from: paragraphRange)
+            let formats = ParagraphAttributedText.parseLines(from: line).first?.formattingRanges ?? []
+            let replacement = ParagraphAttributedText.buildLine(
+                kind: .checklist, style: .body, isChecked: newChecked,
+                text: stripped.text, formattingRanges: formats
+            )
 
             guard let mutable = textView.attributedText.mutableCopy() as? NSMutableAttributedString else { return }
             let priorSelection = textView.selectedRange

@@ -7,6 +7,17 @@ options:
 configs:
   Debug: debug
   Release: release
+schemes:
+  Braindump:
+    build:
+      targets:
+        Braindump: all
+    test:
+      targets:
+        - BraindumpTests
+        - BraindumpUITests
+    archive:
+      config: Release
 targets:
   Braindump:
     type: application
@@ -82,3 +93,27 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         SKIP_INSTALL: "YES"
+  BraindumpTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: BraindumpTests
+    dependencies:
+      - target: Braindump
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+  BraindumpUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: BraindumpUITests
+    dependencies:
+      - target: Braindump
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"

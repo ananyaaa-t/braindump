@@ -5,10 +5,14 @@ import FoundationModels
 struct PageView: View {
     @Bindable var page: Page
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @FocusState private var titleFocused: Bool
     @StateObject private var voiceRecorder = VoiceRecorder()
     @StateObject private var editorController = RichTextEditorController()
     @State private var showingInfo = false
+    @State private var showingColorPicker = false
+    @State private var showingSaveError = false
+    @State private var saveErrorMessage = ""
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -19,6 +23,8 @@ struct PageView: View {
                     Color.clear.frame(height: 28)
 
                     TextField("untitled", text: $page.title, axis: .vertical)
+                        .accessibilityLabel("Page title")
+                        .accessibilityIdentifier("page-title")
                         .font(AppFont.display(32))
                         .foregroundStyle(.ink)
                         .focused($titleFocused)
@@ -73,6 +79,18 @@ struct PageView: View {
         .onChange(of: voiceRecorder.isRecording) { _, isRecording in
             if !isRecording { commitDictation() }
         }
+        .alert("Couldn't save page", isPresented: $showingSaveError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveErrorMessage)
+        }
+        #if DEBUG
+        .onAppear {
+            if ProcessInfo.processInfo.environment["DEMO_SHOW_COLOR_PICKER"] == "1" {
+                showingColorPicker = true
+            }
+        }
+        #endif
     }
 
     private var isBodyEmpty: Bool {
@@ -81,12 +99,19 @@ struct PageView: View {
 
     private var backButton: some View {
         Button {
-            dismiss()
+            do {
+                try modelContext.save()
+                dismiss()
+            } catch {
+                saveErrorMessage = error.localizedDescription
+                showingSaveError = true
+            }
         } label: {
             Image(systemName: "chevron.left")
                 .font(.system(size: 17, weight: .light))
                 .foregroundStyle(.dune)
                 .padding(12)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .accessibilityLabel("Back")
         .padding(.leading, 8)
@@ -104,6 +129,7 @@ struct PageView: View {
                     .font(.system(size: 16, weight: .light))
                     .foregroundStyle(voiceRecorder.isRecording ? Color.ink : Color.dune)
                     .padding(12)
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .accessibilityLabel(voiceRecorder.isRecording ? "Stop dictation" : "Start dictation")
 
@@ -114,6 +140,7 @@ struct PageView: View {
                     .font(.system(size: 16, weight: .light))
                     .foregroundStyle(.dune)
                     .padding(12)
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .accessibilityLabel("Page details")
         }
@@ -200,6 +227,7 @@ struct PageView: View {
                 .font(AppFont.body(15))
                 .foregroundStyle(.dune)
                 .padding(12)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .accessibilityLabel("Text style")
     }
@@ -232,18 +260,23 @@ struct PageView: View {
 
     private var controlBar: some View {
         HStack(spacing: 20) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
-                    ForEach(PageColor.allCases) { option in
-                        ColorDot(color: option.color, isSelected: page.color == option) {
-                            withAnimation(.easeInOut(duration: 0.15)) { page.color = option }
-                        }
-                        .accessibilityLabel("\(option.rawValue.capitalized) color")
-                        .accessibilityAddTraits(page.color == option ? [.isButton, .isSelected] : .isButton)
-                    }
-                }
-                .padding(.vertical, 4)
+            Button {
+                showingColorPicker = true
+            } label: {
+                Circle()
+                    .fill(page.color.color)
+                    .frame(width: 26, height: 26)
+                    .overlay(Circle().stroke(Color.ink.opacity(0.35), lineWidth: 1))
+                    .frame(minWidth: 44, minHeight: 44)
             }
+            .accessibilityLabel("Change page color, currently \(page.color.rawValue.capitalized)")
+            .popover(isPresented: $showingColorPicker) {
+                colorPickerGrid
+                    .padding(20)
+                    .presentationCompactAdaptation(.popover)
+            }
+
+            Spacer()
 
             Button(role: .destructive) {
                 page.softDelete()
@@ -256,7 +289,7 @@ struct PageView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 16, weight: .light))
-                    .foregroundStyle(.dune)
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .accessibilityLabel("Delete page")
         }
@@ -267,31 +300,41 @@ struct PageView: View {
             Rectangle().fill(page.color.color.darkerTint()).frame(height: 0.5)
         }
     }
-}
 
-private struct ColorDot: View {
-    let color: Color
-    let isSelected: Bool
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Circle()
-                .fill(color)
-                .frame(width: 22, height: 22)
-                .overlay(
+    /// Grid of all `PageColor` swatches shown in the popover triggered by
+    /// `controlBar`'s single current-color button — collapses what used to
+    /// be 10 always-visible dots crowding the bottom bar (right next to the
+    /// delete button) into one compact control, per design feedback.
+    private var colorPickerGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
+            ForEach(PageColor.allCases) { option in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { page.color = option }
+                    showingColorPicker = false
+                } label: {
                     Circle()
-                        .stroke(Color.ink.opacity(isSelected ? 0.6 : 0), lineWidth: 1.5)
-                        .padding(-3)
-                )
+                        .fill(option.color)
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.ink.opacity(page.color == option ? 0.6 : 0), lineWidth: 2)
+                                .padding(-3)
+                        )
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(option.rawValue.capitalized) color")
+                .accessibilityAddTraits(page.color == option ? [.isButton, .isSelected] : .isButton)
+            }
         }
-        .buttonStyle(.plain)
+        .frame(width: 264)
     }
 }
 
 private struct InfoSheet: View {
     @Bindable var page: Page
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var overviewText: String?
     @State private var overviewIsGenerated = false
     @State private var isGeneratingOverview = false
@@ -305,20 +348,21 @@ private struct InfoSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 24) {
-                lastEditedRow
-                tagsSection
-                overviewSection
-                actionItemsSection
-                if let aiUnavailableReason {
-                    Text(aiUnavailableReason)
-                        .font(AppFont.body(12))
-                        .foregroundStyle(.dune)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    lastEditedRow
+                    tagsSection
+                    overviewSection
+                    actionItemsSection
+                    if let aiUnavailableReason {
+                        Text(aiUnavailableReason)
+                            .font(AppFont.body(12))
+                            .foregroundStyle(.dune)
+                    }
                 }
-                Spacer()
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(page.color.color.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -344,7 +388,7 @@ private struct InfoSheet: View {
                 isGeneratingOverview = false
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
     }
 
     /// Fallback path used on OS versions below 26, or when the model turns
