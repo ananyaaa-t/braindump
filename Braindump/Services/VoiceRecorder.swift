@@ -12,6 +12,7 @@ final class VoiceRecorder: ObservableObject {
     private let audioEngine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
+    private var recordingRequestID: UUID?
 
     func toggle() {
         if isRecording {
@@ -22,29 +23,42 @@ final class VoiceRecorder: ObservableObject {
     }
 
     func start() {
+        guard recordingRequestID == nil else { return }
+        let requestID = UUID()
+        recordingRequestID = requestID
         transcript = ""
         errorMessage = nil
 
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             Task { @MainActor in
+                guard let self, self.recordingRequestID == requestID else { return }
                 guard status == .authorized else {
-                    self?.errorMessage = "Speech recognition isn't authorized."
+                    self.errorMessage = "Speech recognition isn't authorized."
+                    self.recordingRequestID = nil
                     return
                 }
-                await self?.beginRecording()
+                await self.beginRecording(requestID: requestID)
             }
         }
     }
 
-    private func beginRecording() async {
+    private func beginRecording(requestID: UUID) async {
         guard let recognizer, recognizer.isAvailable else {
             errorMessage = "Speech recognition isn't available right now."
+            recordingRequestID = nil
+            return
+        }
+        guard recognizer.supportsOnDeviceRecognition else {
+            errorMessage = "On-device dictation isn't available. You can type your moment instead."
+            recordingRequestID = nil
             return
         }
 
         let micGranted = await AVAudioApplication.requestRecordPermission()
+        guard recordingRequestID == requestID else { return }
         guard micGranted else {
             errorMessage = "Microphone access is needed to dictate."
+            recordingRequestID = nil
             return
         }
 
@@ -54,14 +68,13 @@ final class VoiceRecorder: ObservableObject {
             try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             errorMessage = "Couldn't start the audio session."
+            recordingRequestID = nil
             return
         }
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        if recognizer.supportsOnDeviceRecognition {
-            request.requiresOnDeviceRecognition = true
-        }
+        request.requiresOnDeviceRecognition = true
         self.request = request
 
         let inputNode = audioEngine.inputNode
@@ -76,6 +89,14 @@ final class VoiceRecorder: ObservableObject {
             try audioEngine.start()
         } catch {
             errorMessage = "Couldn't start the microphone."
+            recordingRequestID = nil
+            self.request = nil
+            inputNode.removeTap(onBus: 0)
+            do {
+                try session.setActive(false, options: .notifyOthersOnDeactivation)
+            } catch {
+                errorMessage = "Couldn't release the audio session: \(error.localizedDescription)"
+            }
             return
         }
 
@@ -83,10 +104,14 @@ final class VoiceRecorder: ObservableObject {
 
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
             Task { @MainActor in
+                guard self?.recordingRequestID == requestID else { return }
                 if let result {
                     self?.transcript = result.bestTranscription.formattedString
                 }
-                if error != nil {
+                if let error {
+                    self?.errorMessage = "Dictation stopped: \(error.localizedDescription)"
+                    self?.stop()
+                } else if result?.isFinal == true {
                     self?.stop()
                 }
             }
@@ -94,6 +119,7 @@ final class VoiceRecorder: ObservableObject {
     }
 
     func stop() {
+        recordingRequestID = nil
         guard isRecording || audioEngine.isRunning else { return }
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
@@ -102,6 +128,10 @@ final class VoiceRecorder: ObservableObject {
         task?.cancel()
         task = nil
         isRecording = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            errorMessage = "Couldn't release the audio session: \(error.localizedDescription)"
+        }
     }
 }

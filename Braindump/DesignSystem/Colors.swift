@@ -11,7 +11,7 @@ import SwiftUI
 /// instead of round-tripping through `Color`.
 enum AppUIColor {
     static let ink = UIColor.adaptive(light: "#453F37", dark: "#EBDFCE")
-    static let dune = UIColor.adaptive(light: "#A8998A", dark: "#AD9E8E")
+    static let dune = UIColor.adaptive(light: "#776F64", dark: "#B8AFA2")
 }
 
 extension UIColor {
@@ -54,10 +54,8 @@ extension Color {
     }
 
     static let paper = Color.adaptive(light: "#FAF6EE", dark: "#21201D")
+    static let surface = Color.adaptive(light: "#FFFDF8", dark: "#2A2824")
 
-    // Brightened, more saturated "candy" pastels (each keeps its original
-    // hue/identity so `PageColor` call sites elsewhere don't need to
-    // change) matching a punchier sticky-note-style reference design.
     static let butter = Color.adaptive(light: "#FFF0C0", dark: "#4C432C")
     static let blush = Color.adaptive(light: "#FDDDD8", dark: "#4C322C")
     static let sage = Color.adaptive(light: "#DFF0D0", dark: "#3C4C2C")
@@ -100,6 +98,7 @@ extension Color {
 
 extension ShapeStyle where Self == Color {
     static var paper: Color { .paper }
+    static var surface: Color { .surface }
     static var butter: Color { .butter }
     static var blush: Color { .blush }
     static var sage: Color { .sage }

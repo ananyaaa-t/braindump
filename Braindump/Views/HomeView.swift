@@ -20,7 +20,7 @@ struct HomeView: View {
     init() {}
 
     private var pages: [Page] {
-        allPages.filter { !$0.isTrashed }
+        allPages.filter { !$0.isTrashed && $0.growthKind == nil }
     }
 
     private var recentlyDeletedPages: [Page] {
@@ -78,9 +78,9 @@ struct HomeView: View {
                                 }
                             }
 
-                            if !recentlyDeletedPages.isEmpty {
-                                recentlyDeletedRow
-                            }
+                        }
+                        if !recentlyDeletedPages.isEmpty {
+                            recentlyDeletedRow
                         }
                     }
                     .padding(.horizontal, 20)
@@ -117,7 +117,7 @@ struct HomeView: View {
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Braindump")
+                Text("Notes")
                     .font(AppFont.display(32))
                     .foregroundStyle(.ink)
 
@@ -128,21 +128,13 @@ struct HomeView: View {
 
             Spacer()
 
-            avatarBadge
+            Image("BrandMark")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .accessibilityHidden(true)
         }
-    }
-
-    private var avatarBadge: some View {
-        Image("BrandMark")
-            .resizable()
-            .scaledToFill()
-            .frame(width: 40, height: 40)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.hairline, lineWidth: 1)
-            }
-            .accessibilityHidden(true)
     }
 
     private var searchField: some View {
@@ -172,7 +164,7 @@ struct HomeView: View {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(Color.brandAccent)
                 )
-                .shadow(color: Color.brandAccent.opacity(0.45), radius: 16, y: 8)
+                .shadow(color: Color.brandAccent.opacity(0.35), radius: 12, y: 6)
         }
         .padding(.trailing, 20)
         .padding(.bottom, 24)
@@ -346,10 +338,6 @@ private struct PageGridDropDelegate: DropDelegate {
     }
 }
 
-/// A single note on the home screen's grid: a colored "sticky note" card
-/// tinted per `page.color`, with an optional tag chip, title, preview
-/// snippet, and relative timestamp -- all text tinted to the card's own
-/// color (`page.color.textColor`) rather than the app-wide neutral ink.
 private struct NoteCard: View {
     let page: Page
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -389,7 +377,7 @@ private struct NoteCard: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(page.color.color)
         )
-        .shadow(color: page.color.textColor.opacity(0.18), radius: 12, y: 4)
+        .shadow(color: page.color.textColor.opacity(0.14), radius: 10, y: 4)
     }
 
     private func tagChip(_ tag: String) -> some View {

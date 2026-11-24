@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import FoundationModels
+import WidgetKit
+import UIKit
 
 struct PageView: View {
     @Bindable var page: Page
@@ -22,7 +24,7 @@ struct PageView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Color.clear.frame(height: 28)
 
-                    TextField("untitled", text: $page.title, axis: .vertical)
+                    TextField(page.growthKind == nil ? "untitled" : "A moment worth keeping", text: $page.title, axis: .vertical)
                         .accessibilityLabel("Page title")
                         .accessibilityIdentifier("page-title")
                         .font(AppFont.display(32))
@@ -37,9 +39,21 @@ struct PageView: View {
                     Divider()
                         .overlay(page.color.color.darkerTint())
 
+                    if page.growthKind != nil {
+                        GrowthMetadataView(page: page)
+                    }
+                    if let data = page.photoData, let image = UIImage(data: data) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 300)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                            .accessibilityLabel("Photo saved with this moment")
+                    }
+
                     ZStack(alignment: .topLeading) {
                         if isBodyEmpty {
-                            Text("write something…")
+                            Text(page.growthKind == nil ? "write something…" : "Add a note (optional)...")
                                 .font(AppFont.body(18))
                                 .foregroundStyle(.dune)
                                 .allowsHitTesting(false)
@@ -79,6 +93,7 @@ struct PageView: View {
         .onChange(of: voiceRecorder.isRecording) { _, isRecording in
             if !isRecording { commitDictation() }
         }
+        .onDisappear { voiceRecorder.stop() }
         .alert("Couldn't save page", isPresented: $showingSaveError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -101,6 +116,7 @@ struct PageView: View {
         Button {
             do {
                 try modelContext.save()
+                WidgetCenter.shared.reloadAllTimelines()
                 dismiss()
             } catch {
                 saveErrorMessage = error.localizedDescription
@@ -280,12 +296,20 @@ struct PageView: View {
 
             Button(role: .destructive) {
                 page.softDelete()
-                NotificationCenter.default.post(
-                    name: .pageSoftDeleted,
-                    object: nil,
-                    userInfo: ["pageID": page.persistentModelID, "title": page.title]
-                )
-                dismiss()
+                do {
+                    try modelContext.save()
+                    WidgetCenter.shared.reloadAllTimelines()
+                    NotificationCenter.default.post(
+                        name: .pageSoftDeleted,
+                        object: nil,
+                        userInfo: ["pageID": page.persistentModelID, "title": page.title]
+                    )
+                    dismiss()
+                } catch {
+                    page.restore()
+                    saveErrorMessage = error.localizedDescription
+                    showingSaveError = true
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 16, weight: .light))
@@ -331,6 +355,50 @@ struct PageView: View {
     }
 }
 
+private struct GrowthMetadataView: View {
+    @Bindable var page: Page
+    @Query private var pages: [Page]
+
+    private var goals: [Page] {
+        pages.filter { !$0.isTrashed && $0.growthKind == .goal }.sorted { $0.title < $1.title }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if page.growthKind == .goal {
+                Label("Personal goal", systemImage: "bookmark")
+                    .font(AppFont.body(13))
+            } else {
+                Picker("Moment type", selection: Binding(
+                    get: { page.growthKind ?? .win },
+                    set: { page.growthKind = $0; page.updatedAt = .now }
+                )) {
+                    ForEach(GrowthKind.allCases.filter { $0 != .goal }) { Text($0.label).tag($0) }
+                }
+                DatePicker("When it happened", selection: Binding(
+                    get: { page.eventDate },
+                    set: { page.occurredAt = $0; page.updatedAt = .now }
+                ), in: ...Date.now, displayedComponents: .date)
+                Picker("Personal goal", selection: $page.linkedGoalID) {
+                    Text("No linked goal").tag(nil as UUID?)
+                    ForEach(goals) { Text($0.title).tag($0.uuid as UUID?) }
+                    if let id = page.linkedGoalID, !goals.contains(where: { $0.uuid == id }) {
+                        Text("Previously linked goal (deleted)").tag(id as UUID?)
+                    }
+                }
+                .onChange(of: page.linkedGoalID) { page.updatedAt = .now }
+            }
+            Picker("Category", selection: Binding(
+                get: { page.growthCategory },
+                set: { page.growthCategory = $0; page.updatedAt = .now }
+            )) {
+                ForEach(GrowthCategory.allCases) { Text($0.label).tag($0) }
+            }
+        }
+        .font(AppFont.body(14))
+    }
+}
+
 private struct InfoSheet: View {
     @Bindable var page: Page
     @Environment(\.dismiss) private var dismiss
@@ -351,9 +419,14 @@ private struct InfoSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     lastEditedRow
-                    tagsSection
+                    if page.growthKind == nil {
+                        tagsSection
+                    } else {
+                        Text("\(page.growthKind?.label ?? "") · \(page.growthCategory.label)")
+                            .font(AppFont.body(14))
+                    }
                     overviewSection
-                    actionItemsSection
+                    if page.growthKind == nil { actionItemsSection }
                     if let aiUnavailableReason {
                         Text(aiUnavailableReason)
                             .font(AppFont.body(12))
@@ -396,7 +469,7 @@ private struct InfoSheet: View {
     /// extractive summarizer. No fallback for action items — see
     /// `NoteAnalyzer.extractActionItems`.
     private func loadFallbackContent() {
-        if page.tags.isEmpty {
+        if page.growthKind == nil, page.tags.isEmpty {
             page.tags = NoteAnalyzer.suggestedTags(for: page)
             tagsAreGenerated = false
         }
@@ -422,7 +495,7 @@ private struct InfoSheet: View {
 
         let session = NoteAnalyzer.makeSession()
 
-        if page.tags.isEmpty {
+        if page.growthKind == nil, page.tags.isEmpty {
             if let generated = await NoteAnalyzer.generativeTags(for: page, session: session) {
                 page.tags = generated
                 tagsAreGenerated = true
@@ -444,9 +517,11 @@ private struct InfoSheet: View {
         }
         isGeneratingOverview = false
 
-        isFindingActionItems = true
-        suggestedActionItems = await NoteAnalyzer.extractActionItems(for: page, session: session) ?? []
-        isFindingActionItems = false
+        if page.growthKind == nil {
+            isFindingActionItems = true
+            suggestedActionItems = await NoteAnalyzer.extractActionItems(for: page, session: session) ?? []
+            isFindingActionItems = false
+        }
     }
 
     /// Surfaces an explanation the first time a generative call comes back

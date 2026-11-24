@@ -16,7 +16,7 @@ struct BraindumpApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            LittleWinsView()
                 #if DEBUG
                 .background(DemoPageOpener(container: container))
                 #endif
@@ -73,6 +73,31 @@ struct BraindumpApp: App {
                 ("Print a tiny photo album", .bullet, .body, false),
                 ("Try a new dinner recipe", .bullet, .body, false)
             ])
+            let goal = Page(title: "Make room for creative things", color: .lilac)
+            goal.growthKind = .goal
+            goal.growthCategory = .creativity
+            let intention = Paragraph(text: "Try things without needing to be good at them.")
+            intention.page = goal
+            goal.paragraphs.append(intention)
+            context.insert(goal)
+
+            func addMoment(_ title: String, kind: GrowthKind, category: GrowthCategory, daysAgo: Int, goalID: UUID? = nil) {
+                let page = Page(title: title, color: category.color)
+                page.growthKind = kind
+                page.growthCategory = category
+                page.occurredAt = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)
+                page.linkedGoalID = goalID
+                let paragraph = Paragraph(text: title)
+                paragraph.page = page
+                page.paragraphs.append(paragraph)
+                context.insert(page)
+            }
+            addMoment("Tried pottery for the first time", kind: .experience, category: .creativity, daysAgo: 3, goalID: goal.uuid)
+            addMoment("Organized a dinner with friends", kind: .win, category: .connection, daysAgo: 5)
+            addMoment("Went on my first solo hike", kind: .milestone, category: .courage, daysAgo: 8)
+            addMoment("Made time to draw, just for me", kind: .win, category: .creativity, daysAgo: 1, goalID: goal.uuid)
+            addMoment("Explored a neighborhood I always walk past", kind: .experience, category: .adventure, daysAgo: 11)
+            addMoment("A long walk with no particular destination", kind: .win, category: .wellbeing, daysAgo: 2)
             try context.save()
         } catch {
             fatalError("Could not seed demo notes: \(error)")

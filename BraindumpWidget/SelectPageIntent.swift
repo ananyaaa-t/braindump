@@ -39,8 +39,8 @@ struct PageEntityQuery: EntityQuery {
 }
 
 struct SelectPageIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Choose Page"
-    static var description = IntentDescription("Choose which page to show on the widget.")
+    static var title: LocalizedStringResource = "Choose a Moment or Note"
+    static var description = IntentDescription("Choose a moment, goal, or note for your Braindump widget.")
 
     @Parameter(title: "Page")
     var page: PageEntity?

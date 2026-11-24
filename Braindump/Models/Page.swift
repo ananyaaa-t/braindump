@@ -7,6 +7,48 @@ enum ParagraphKind: String, Codable {
     case checklist
 }
 
+enum GrowthKind: String, CaseIterable, Identifiable, Codable {
+    case win, experience, milestone, goal
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .win: return "Little win"
+        case .experience: return "New experience"
+        case .milestone: return "Milestone"
+        case .goal: return "Personal goal"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .win: return "sparkles"
+        case .experience: return "sun.max"
+        case .milestone: return "flag"
+        case .goal: return "leaf"
+        }
+    }
+}
+
+enum GrowthCategory: String, CaseIterable, Identifiable, Codable {
+    case everyday, connection, creativity, adventure, wellbeing, courage
+
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+
+    var color: PageColor {
+        switch self {
+        case .everyday: return .butter
+        case .connection: return .blush
+        case .creativity: return .lilac
+        case .adventure: return .sky
+        case .wellbeing: return .sage
+        case .courage: return .clay
+        }
+    }
+}
+
 /// A single character-level formatting run within a paragraph's text —
 /// bold/italic/underline are independent toggles, layered on top of the
 /// paragraph's kind/style. Stored separately from `Paragraph.text` (which
@@ -54,6 +96,12 @@ final class Page {
     var tags: [String] = []
     var isTrashed: Bool = false
     var deletedAt: Date?
+    // Optional additions keep existing notes in the same shared store.
+    var growthKindRaw: String?
+    var growthCategoryRaw: String?
+    var occurredAt: Date?
+    var linkedGoalID: UUID?
+    @Attribute(.externalStorage) var photoData: Data?
 
     @Relationship(deleteRule: .cascade, inverse: \Paragraph.page)
     var paragraphs: [Paragraph] = []
@@ -79,6 +127,22 @@ final class Page {
         NoteAnalyzer.previewLine(for: self)
     }
 
+    var growthKind: GrowthKind? {
+        get { growthKindRaw.flatMap(GrowthKind.init(rawValue:)) }
+        set { growthKindRaw = newValue?.rawValue }
+    }
+
+    var growthCategory: GrowthCategory {
+        get { growthCategoryRaw.flatMap(GrowthCategory.init(rawValue:)) ?? .everyday }
+        set { growthCategoryRaw = newValue.rawValue }
+    }
+
+    var eventDate: Date { occurredAt ?? createdAt }
+
+    var isMoment: Bool {
+        growthKind != nil && growthKind != .goal
+    }
+
     static let recentlyDeletedRetentionDays = 30
 
     func softDelete() {
@@ -89,6 +153,18 @@ final class Page {
     func restore() {
         isTrashed = false
         deletedAt = nil
+    }
+
+    func restore(in context: ModelContext) throws {
+        let previousState = (isTrashed, deletedAt)
+        restore()
+        do {
+            try context.save()
+        } catch {
+            isTrashed = previousState.0
+            deletedAt = previousState.1
+            throw error
+        }
     }
 
     /// Days left before this page is permanently purged, or nil if not deleted.

@@ -1,10 +1,12 @@
 import SwiftUI
 import SwiftData
+import WidgetKit
 
 struct RecentlyDeletedView: View {
     let pages: [Page]
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @State private var errorMessage: String?
 
     private var sortedPages: [Page] {
         pages.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
@@ -24,12 +26,12 @@ struct RecentlyDeletedView: View {
                                 .listRowBackground(Color.clear)
                                 .swipeActions(edge: .trailing) {
                                     Button(role: .destructive) {
-                                        modelContext.delete(page)
+                                        deletePermanently(page)
                                     } label: {
                                         Label("Delete Now", systemImage: "trash")
                                     }
                                     Button {
-                                        page.restore()
+                                        restore(page)
                                     } label: {
                                         Label("Restore", systemImage: "arrow.uturn.backward")
                                     }
@@ -58,6 +60,11 @@ struct RecentlyDeletedView: View {
             }
         }
         .tint(.ink)
+        .alert("Couldn't save changes", isPresented: Binding(
+            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(errorMessage ?? "") }
     }
 
     private var emptyState: some View {
@@ -65,11 +72,31 @@ struct RecentlyDeletedView: View {
             Text("nothing here")
                 .font(AppFont.display(22))
                 .foregroundStyle(.ink)
-            Text("deleted pages show up here for 30 days")
+            Text("deleted moments, goals, and notes stay here for 30 days")
                 .font(AppFont.body(14))
                 .foregroundStyle(.dune)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private func restore(_ page: Page) {
+        do {
+            try page.restore(in: modelContext)
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func deletePermanently(_ page: Page) {
+        modelContext.delete(page)
+        do {
+            try modelContext.save()
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func row(for page: Page) -> some View {

@@ -36,8 +36,8 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         CFBundleDisplayName: Braindump
-        NSMicrophoneUsageDescription: Braindump uses your microphone to let you dictate notes by voice.
-        NSSpeechRecognitionUsageDescription: Braindump transcribes your voice into text, on-device, so you can write notes hands-free.
+        NSMicrophoneUsageDescription: Braindump uses your microphone to capture moments and notes by voice.
+        NSSpeechRecognitionUsageDescription: Braindump transcribes your voice on-device so you can capture moments hands-free.
     entitlements:
       path: Braindump/Braindump.entitlements
       properties:

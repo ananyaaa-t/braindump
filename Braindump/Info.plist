@@ -20,16 +20,16 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Braindump uses your microphone to capture moments and notes by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Braindump transcribes your voice on-device so you can capture moments hands-free.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>CormorantGaramond-Italic.ttf</string>
 		<string>EBGaramond-Regular.ttf</string>
 		<string>EBGaramond-Italic.ttf</string>
 	</array>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Braindump uses your microphone to let you dictate notes by voice.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Braindump transcribes your voice into text, on-device, so you can write notes hands-free.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

@@ -12,7 +12,7 @@ struct PageEntry: TimelineEntry {
 
 struct BraindumpProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> PageEntry {
-        PageEntry(date: .now, title: "Braindump", preview: "your pages, at a glance", colorName: "butter", isConfigured: true)
+        PageEntry(date: .now, title: "Braindump", preview: "thoughts and moments worth keeping", colorName: "butter", isConfigured: true)
     }
 
     func snapshot(for configuration: SelectPageIntent, in context: Context) async -> PageEntry {
@@ -39,7 +39,7 @@ struct BraindumpProvider: AppIntentTimelineProvider {
         let descriptor = FetchDescriptor<Page>()
         let pages = (try? context.fetch(descriptor)) ?? []
 
-        guard let page = pages.first(where: { $0.uuid.uuidString == pageID }) else {
+        guard let page = pages.first(where: { $0.uuid.uuidString == pageID && !$0.isTrashed }) else {
             return PageEntry(
                 date: .now,
                 title: "page not found",
@@ -100,8 +100,8 @@ struct BraindumpWidget: Widget {
         AppIntentConfiguration(kind: kind, intent: SelectPageIntent.self, provider: BraindumpProvider()) { entry in
             BraindumpWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Braindump Page")
-        .description("Shows a page you choose.")
+        .configurationDisplayName("Braindump")
+        .description("Keep a meaningful moment, personal goal, or note close.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
